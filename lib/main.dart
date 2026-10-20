@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'models/note_record.dart';
+
 void main() {
   runApp(const CatchallApp());
 }
@@ -106,13 +108,6 @@ class NoteStorage {
       return null;
     }
   }
-}
-
-class NoteRecord {
-  const NoteRecord({required this.file, required this.createdAt});
-
-  final File file;
-  final DateTime createdAt;
 }
 
 String formatTimestamp(DateTime dateTime) {
