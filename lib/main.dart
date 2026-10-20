@@ -1,121 +1,438 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const CatchallApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class CatchallApp extends StatelessWidget {
+  const CatchallApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Catchall',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const CaptureScreen(),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+class NoteStorage {
+  static Future<Directory> _notesDirectory() async {
+    final appDirectory = await getApplicationDocumentsDirectory();
+    final directory = Directory('${appDirectory.path}/notes');
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
+    if (!await directory.exists()) {
+      await directory.create(recursive: true);
+    }
 
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
+    return directory;
+  }
 
-  final String title;
+  static String _timestamp(DateTime dateTime) {
+    String pad(int value, int width) => value.toString().padLeft(width, '0');
 
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
+    return '${dateTime.year}-'
+        '${pad(dateTime.month, 2)}-'
+        '${pad(dateTime.day, 2)}_'
+        '${pad(dateTime.hour, 2)}-'
+        '${pad(dateTime.minute, 2)}-'
+        '${pad(dateTime.second, 2)}-'
+        '${pad(dateTime.millisecond, 3)}'
+        '${pad(dateTime.microsecond, 3)}';
+  }
+
+  static Future<File> save(String content) async {
+    final directory = await _notesDirectory();
+    final timestamp = _timestamp(DateTime.now());
+    final file = File('${directory.path}/$timestamp.txt');
+
+    await file.writeAsString(content, flush: true);
+    return file;
+  }
+
+  static Future<List<NoteRecord>> list() async {
+    final directory = await _notesDirectory();
+    final records = <NoteRecord>[];
+
+    await for (final entity in directory.list()) {
+      if (entity is! File || !entity.path.endsWith('.txt')) {
+        continue;
+      }
+
+      final name = entity.uri.pathSegments.last;
+      final timestamp = _parseTimestamp(name);
+
+      if (timestamp != null) {
+        records.add(NoteRecord(file: entity, createdAt: timestamp));
+      }
+    }
+
+    records.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return records;
+  }
+
+  static DateTime? _parseTimestamp(String filename) {
+    final match = RegExp(
+      r'^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})-(\d{6})\.txt$',
+    ).firstMatch(filename);
+
+    if (match == null) return null;
+
+    try {
+      final microseconds = int.parse(match.group(7)!);
+      return DateTime(
+        int.parse(match.group(1)!),
+        int.parse(match.group(2)!),
+        int.parse(match.group(3)!),
+        int.parse(match.group(4)!),
+        int.parse(match.group(5)!),
+        int.parse(match.group(6)!),
+        microseconds ~/ 1000,
+        microseconds % 1000,
+      );
+    } on FormatException {
+      return null;
+    }
+  }
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+class NoteRecord {
+  const NoteRecord({required this.file, required this.createdAt});
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  final File file;
+  final DateTime createdAt;
+}
+
+String formatTimestamp(DateTime dateTime) {
+  String pad(int value) => value.toString().padLeft(2, '0');
+
+  return '${dateTime.year}-${pad(dateTime.month)}-'
+      '${pad(dateTime.day)} '
+      '${pad(dateTime.hour)}:${pad(dateTime.minute)}:'
+      '${pad(dateTime.second)}';
+}
+
+class CaptureScreen extends StatefulWidget {
+  const CaptureScreen({super.key});
+
+  @override
+  State<CaptureScreen> createState() => _CaptureScreenState();
+}
+
+class _CaptureScreenState extends State<CaptureScreen> {
+  final _controller = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveNote() async {
+    final content = _controller.text;
+
+    if (content.trim().isEmpty || _saving) return;
+
+    setState(() => _saving = true);
+
+    try {
+      await NoteStorage.save(content);
+
+      if (!mounted) return;
+
+      _controller.clear();
+      FocusScope.of(context).requestFocus(FocusNode());
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Note saved'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+
+      FocusScope.of(context).requestFocus(_editorFocusNode);
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not save note')));
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  final _editorFocusNode = FocusNode();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Catchall'),
+        actions: [
+          IconButton(
+            tooltip: 'Note history',
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const HistoryScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  focusNode: _editorFocusNode,
+                  autofocus: true,
+                  enabled: !_saving,
+                  keyboardType: TextInputType.multiline,
+                  textCapitalization: TextCapitalization.sentences,
+                  textAlignVertical: TextAlignVertical.top,
+                  expands: true,
+                  maxLines: null,
+                  decoration: const InputDecoration(
+                    hintText: 'What do you want to remember?',
+                    border: OutlineInputBorder(),
+                    alignLabelWithHint: true,
+                  ),
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) {},
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _controller.text.trim().isNotEmpty && !_saving
+                      ? _saveNote
+                      : null,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(_saving ? 'Saving…' : 'Save note'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HistoryScreen extends StatefulWidget {
+  const HistoryScreen({super.key});
+
+  @override
+  State<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends State<HistoryScreen> {
+  late Future<List<NoteRecord>> _notes;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  void _reload() {
+    _notes = NoteStorage.list();
+  }
+
+  Future<void> _deleteNote(NoteRecord note) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete note?'),
+        content: const Text('This note will be permanently deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await note.file.delete();
+
+      if (!mounted) return;
+
+      setState(_reload);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Note deleted')));
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not delete note')));
+    }
+  }
+
+  Future<void> _openNote(NoteRecord note) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => NoteDetailScreen(note: note)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
+    return Scaffold(
+      appBar: AppBar(title: const Text('Note history')),
+      body: FutureBuilder<List<NoteRecord>>(
+        future: _notes,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return const Center(child: Text('Could not load notes.'));
+          }
+
+          final notes = snapshot.data ?? [];
+
+          if (notes.isEmpty) {
+            return const Center(child: Text('No saved notes yet.'));
+          }
+
+          return ListView.separated(
+            itemCount: notes.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final note = notes[index];
+
+              return ListTile(
+                title: Text(formatTimestamp(note.createdAt)),
+                subtitle: FutureBuilder<String>(
+                  future: note.file.readAsString(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Text('Loading…');
+                    }
+
+                    final content = snapshot.data!;
+                    return Text(
+                      content.replaceAll(RegExp(r'\s+'), ' ').trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    );
+                  },
+                ),
+                onTap: () => _openNote(note),
+                trailing: IconButton(
+                  tooltip: 'Delete note',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () => _deleteNote(note),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class NoteDetailScreen extends StatelessWidget {
+  const NoteDetailScreen({super.key, required this.note});
+
+  final NoteRecord note;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: const Text('Saved note'),
+        actions: [
+          IconButton(
+            tooltip: 'Copy note',
+            icon: const Icon(Icons.copy),
+            onPressed: () async {
+              final content = await note.file.readAsString();
+
+              if (!context.mounted) return;
+
+              await Clipboard.setData(ClipboardData(text: content));
+
+              if (!context.mounted) return;
+
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Note copied')));
+            },
+          ),
+        ],
       ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                formatTimestamp(note.createdAt),
+                style: Theme.of(context).textTheme.labelMedium,
+              ),
+              const Divider(height: 24),
+              Expanded(
+                child: FutureBuilder<String>(
+                  future: note.file.readAsString(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return const Text('Could not read this note.');
+                    }
+
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    return SingleChildScrollView(
+                      child: SelectableText(
+                        snapshot.data!,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
       ),
     );
   }
