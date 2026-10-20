@@ -12,12 +12,57 @@ class CaptureScreen extends StatefulWidget {
 
 class _CaptureScreenState extends State<CaptureScreen> {
   final _controller = TextEditingController();
+  final _editorFocusNode = FocusNode();
+
   bool _saving = false;
+  DateTime? _customTimestamp;
 
   @override
   void dispose() {
     _controller.dispose();
+    _editorFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _setCustomTimestamp() async {
+    final initial = _customTimestamp ?? DateTime.now();
+
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1900),
+      lastDate: DateTime(2100),
+      helpText: 'Choose note date',
+    );
+
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+      helpText: 'Choose note time',
+    );
+
+    if (time == null || !mounted) return;
+
+    setState(() {
+      _customTimestamp = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
+    });
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final date = MaterialLocalizations.of(context).formatMediumDate(timestamp);
+    final time = MaterialLocalizations.of(context).formatTimeOfDay(
+      TimeOfDay.fromDateTime(timestamp),
+    );
+
+    return '$date at $time';
   }
 
   Future<void> _saveNote() async {
@@ -28,12 +73,16 @@ class _CaptureScreenState extends State<CaptureScreen> {
     setState(() => _saving = true);
 
     try {
-      await NoteStorage.save(content);
+      await NoteStorage.save(
+        content,
+        createdAt: _customTimestamp,
+      );
 
       if (!mounted) return;
 
       _controller.clear();
-      FocusScope.of(context).requestFocus(FocusNode());
+      _customTimestamp = null;
+      _editorFocusNode.requestFocus();
 
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -43,8 +92,6 @@ class _CaptureScreenState extends State<CaptureScreen> {
             duration: Duration(seconds: 1),
           ),
         );
-
-      FocusScope.of(context).requestFocus(_editorFocusNode);
     } catch (error) {
       if (!mounted) return;
 
@@ -58,14 +105,30 @@ class _CaptureScreenState extends State<CaptureScreen> {
     }
   }
 
-  final _editorFocusNode = FocusNode();
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Catchall'),
         actions: [
+          PopupMenuButton<String>(
+            tooltip: 'More options',
+            onSelected: (value) {
+              if (value == 'timestamp') {
+                _setCustomTimestamp();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem<String>(
+                value: 'timestamp',
+                child: ListTile(
+                  leading: Icon(Icons.calendar_month),
+                  title: Text('Set note date/time'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
           IconButton(
             tooltip: 'Note history',
             icon: const Icon(Icons.history),
@@ -82,6 +145,29 @@ class _CaptureScreenState extends State<CaptureScreen> {
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
+              if (_customTimestamp != null) ...[
+                Row(
+                  children: [
+                    const Icon(Icons.schedule, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _formatTimestamp(_customTimestamp!),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Use current date/time',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        setState(() => _customTimestamp = null);
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
               Expanded(
                 child: TextField(
                   controller: _controller,

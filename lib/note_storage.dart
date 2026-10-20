@@ -29,10 +29,22 @@ class NoteStorage {
         '${pad(dateTime.microsecond, 3)}';
   }
 
-  static Future<File> save(String content) async {
+  static Future<File> save(
+    String content, {
+    DateTime? createdAt,
+  }) async {
     final directory = await _notesDirectory();
-    final timestamp = _timestamp(DateTime.now());
-    final file = File('${directory.path}/$timestamp.txt');
+    var timestampDateTime = createdAt ?? DateTime.now();
+    var timestamp = _timestamp(timestampDateTime);
+    var file = File('${directory.path}/$timestamp.txt');
+
+    while (await file.exists()) {
+      timestampDateTime = timestampDateTime.add(
+        const Duration(microseconds: 1),
+      );
+      timestamp = _timestamp(timestampDateTime);
+      file = File('${directory.path}/$timestamp.txt');
+    }
 
     await file.writeAsString(content, flush: true);
     return file;
