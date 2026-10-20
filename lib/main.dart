@@ -208,6 +208,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
                   controller: _controller,
                   focusNode: _editorFocusNode,
                   autofocus: true,
+                  onTap: () {
+                    _editorFocusNode.requestFocus();
+                  },
                   enabled: !_saving,
                   keyboardType: TextInputType.multiline,
                   textCapitalization: TextCapitalization.sentences,
