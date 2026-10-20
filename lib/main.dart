@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'models/note_record.dart';
+import 'utils/date_time_utils.dart';
 
 void main() {
   runApp(const CatchallApp());
@@ -108,15 +109,6 @@ class NoteStorage {
       return null;
     }
   }
-}
-
-String formatTimestamp(DateTime dateTime) {
-  String pad(int value) => value.toString().padLeft(2, '0');
-
-  return '${dateTime.year}-${pad(dateTime.month)}-'
-      '${pad(dateTime.day)} '
-      '${pad(dateTime.hour)}:${pad(dateTime.minute)}:'
-      '${pad(dateTime.second)}';
 }
 
 class CaptureScreen extends StatefulWidget {
