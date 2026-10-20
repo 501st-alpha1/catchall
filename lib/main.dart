@@ -16,7 +16,11 @@ class CatchallApp extends StatelessWidget {
     return MaterialApp(
       title: 'Catchall',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.teal,
+          brightness: Brightness.dark,
+        ),
+        brightness: Brightness.dark,
         useMaterial3: true,
       ),
       home: const CaptureScreen(),
