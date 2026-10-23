@@ -68,6 +68,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => NoteDetailScreen(note: note)),
     );
+
+    if (mounted) {
+      setState(_reload);
+    }
   }
 
   @override

@@ -29,10 +29,7 @@ class NoteStorage {
         '${pad(dateTime.microsecond, 3)}';
   }
 
-  static Future<File> save(
-    String content, {
-    DateTime? createdAt,
-  }) async {
+  static Future<File> save(String content, {DateTime? createdAt}) async {
     final directory = await _notesDirectory();
     var timestampDateTime = createdAt ?? DateTime.now();
     var timestamp = _timestamp(timestampDateTime);
@@ -48,6 +45,42 @@ class NoteStorage {
 
     await file.writeAsString(content, flush: true);
     return file;
+  }
+
+  static Future<File> update(
+    NoteRecord note,
+    String content, {
+    required DateTime createdAt,
+  }) async {
+    final directory = await _notesDirectory();
+    final timestamp = _timestamp(createdAt);
+    final destination = File('${directory.path}/$timestamp.txt');
+    final sameFile = note.file.absolute.path == destination.absolute.path;
+
+    if (!sameFile && await destination.exists()) {
+      throw const FileSystemException(
+        'Another note already uses that timestamp.',
+      );
+    }
+
+    final temporary = File(
+      '${directory.path}/.edit-${DateTime.now().microsecondsSinceEpoch}.tmp',
+    );
+
+    try {
+      await temporary.writeAsString(content, flush: true);
+      final updatedFile = await temporary.rename(destination.path);
+
+      if (!sameFile) {
+        await note.file.delete();
+      }
+
+      return updatedFile;
+    } finally {
+      if (await temporary.exists()) {
+        await temporary.delete();
+      }
+    }
   }
 
   static Future<List<NoteRecord>> list() async {
