@@ -19,6 +19,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   final _scrollController = ScrollController();
 
   String _query = '';
+  double _scrollOffset = 0;
 
   @override
   void initState() {
@@ -97,13 +98,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _openNote(NoteRecord note) async {
+    _scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0;
+
     await Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => NoteDetailScreen(note: note)),
     );
 
-    if (mounted) {
-      setState(_reload);
-    }
+    if (!mounted) return;
+
+    final notesFuture = _loadNotes();
+    setState(() {
+      _notes = notesFuture;
+    });
+
+    await notesFuture;
+    if (!mounted) return;
+
+    await WidgetsBinding.instance.endOfFrame;
+
+    if (!_scrollController.hasClients) return;
+
+    final maxOffset = _scrollController.position.maxScrollExtent;
+    _scrollController.jumpTo(_scrollOffset.clamp(0.0, maxOffset).toDouble());
   }
 
   @override
