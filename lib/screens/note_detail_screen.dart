@@ -1,10 +1,7 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/note_record.dart';
-import '../note_storage.dart';
 import '../utils/date_time_utils.dart';
 
 import 'note_edit_screen.dart';
