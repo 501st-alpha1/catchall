@@ -120,4 +120,3 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     );
   }
 }
-

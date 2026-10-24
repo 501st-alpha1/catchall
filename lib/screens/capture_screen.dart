@@ -58,9 +58,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   String _formatTimestamp(DateTime timestamp) {
     final date = MaterialLocalizations.of(context).formatMediumDate(timestamp);
-    final time = MaterialLocalizations.of(context).formatTimeOfDay(
-      TimeOfDay.fromDateTime(timestamp),
-    );
+    final time = MaterialLocalizations.of(
+      context,
+    ).formatTimeOfDay(TimeOfDay.fromDateTime(timestamp));
 
     return '$date at $time';
   }
@@ -73,10 +73,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     setState(() => _saving = true);
 
     try {
-      await NoteStorage.save(
-        content,
-        createdAt: _customTimestamp,
-      );
+      await NoteStorage.save(content, createdAt: _customTimestamp);
 
       if (!mounted) return;
 
