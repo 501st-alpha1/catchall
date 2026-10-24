@@ -15,10 +15,18 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   late Future<List<NoteRecord>> _notes;
 
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _reload();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   void _reload() {
@@ -96,6 +104,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           }
 
           return ListView.separated(
+            controller: _scrollController,
             itemCount: notes.length,
             separatorBuilder: (_, _) => const Divider(height: 1),
             itemBuilder: (context, index) {
