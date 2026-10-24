@@ -10,7 +10,8 @@ class CaptureScreen extends StatefulWidget {
   State<CaptureScreen> createState() => _CaptureScreenState();
 }
 
-class _CaptureScreenState extends State<CaptureScreen> {
+class _CaptureScreenState extends State<CaptureScreen>
+    with WidgetsBindingObserver {
   final _controller = TextEditingController();
   final _editorFocusNode = FocusNode();
 
@@ -18,10 +19,24 @@ class _CaptureScreenState extends State<CaptureScreen> {
   DateTime? _customTimestamp;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _editorFocusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted && !_saving) {
+      _editorFocusNode.requestFocus();
+    }
   }
 
   Future<void> _setCustomTimestamp() async {
