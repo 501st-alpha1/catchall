@@ -208,7 +208,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                         onTap: () => _focusNode.requestFocus(),
                         enabled: !_saving,
                         keyboardType: TextInputType.multiline,
-                        textCapitalization: TextCapitalization.sentences,
+                        textCapitalization: TextCapitalization.none,
                         textAlignVertical: TextAlignVertical.top,
                         expands: true,
                         maxLines: null,

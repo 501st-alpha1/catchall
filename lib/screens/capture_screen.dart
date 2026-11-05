@@ -190,7 +190,7 @@ class _CaptureScreenState extends State<CaptureScreen>
                   },
                   enabled: !_saving,
                   keyboardType: TextInputType.multiline,
-                  textCapitalization: TextCapitalization.sentences,
+                  textCapitalization: TextCapitalization.none,
                   textAlignVertical: TextAlignVertical.top,
                   expands: true,
                   maxLines: null,
