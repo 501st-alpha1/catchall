@@ -10,6 +10,46 @@ class SshConnection {
 
   final SshKeyManager keyManager;
 
+  Future<String> getPresentedHostFingerprint(
+    SshConnectionSettings settings,
+  ) async {
+    if (settings.host.trim().isEmpty ||
+        settings.port < 1 ||
+        settings.port > 65535) {
+      throw StateError('Invalid SSH host or port.');
+    }
+
+    final socket = await SSHSocket.connect(settings.host.trim(), settings.port);
+
+    String? fingerprint;
+
+    final client = SSHClient(
+      socket,
+      username: settings.username.trim().isEmpty
+          ? 'fingerprint-check'
+          : settings.username.trim(),
+      onVerifyHostKey: (type, value) {
+        fingerprint = utf8.decode(value);
+        return false;
+      },
+      handshakeTimeout: const Duration(seconds: 15),
+    );
+
+    try {
+      await client.authenticated;
+    } catch (_) {
+      if (fingerprint == null) rethrow;
+    } finally {
+      await client.close();
+    }
+
+    if (fingerprint == null) {
+      throw StateError('The SSH server did not provide a host key.');
+    }
+
+    return fingerprint!;
+  }
+
   Future<void> testConnection(SshConnectionSettings settings) async {
     if (!settings.isConfigured) {
       throw StateError('SSH connection settings are incomplete.');

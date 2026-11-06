@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'history_screen.dart';
+import 'ssh_settings_screen.dart';
 import '../note_storage.dart';
 
 class CaptureScreen extends StatefulWidget {
@@ -128,6 +129,12 @@ class _CaptureScreenState extends State<CaptureScreen>
             onSelected: (value) {
               if (value == 'timestamp') {
                 _setCustomTimestamp();
+              } else if (value == 'ssh') {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SshSettingsScreen(),
+                  ),
+                );
               }
             },
             itemBuilder: (context) => [
@@ -136,6 +143,14 @@ class _CaptureScreenState extends State<CaptureScreen>
                 child: ListTile(
                   leading: Icon(Icons.calendar_month),
                   title: Text('Set note date/time'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuItem<String>(
+                value: 'ssh',
+                child: ListTile(
+                  leading: Icon(Icons.sync),
+                  title: Text('SSH transfer settings'),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
