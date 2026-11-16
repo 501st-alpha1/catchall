@@ -91,6 +91,8 @@ class _SshSettingsScreenState extends State<SshSettingsScreen> {
   }
 
   Future<void> _generateKey() async {
+    if (_working) return;
+
     setState(() => _working = true);
 
     try {
@@ -121,6 +123,8 @@ class _SshSettingsScreenState extends State<SshSettingsScreen> {
   }
 
   Future<void> _retrieveFingerprint() async {
+    if (_working) return;
+
     final settings = _currentSettings();
 
     if (settings.host.trim().isEmpty ||
@@ -140,6 +144,9 @@ class _SshSettingsScreenState extends State<SshSettingsScreen> {
       if (!mounted) return;
 
       setState(() => _presentedFingerprint = fingerprint);
+      _showMessage(
+        'Fingerprint retrieved. Verify it against your computer before trusting it.',
+      );
     } catch (error) {
       if (mounted) {
         _showMessage('Could not retrieve server fingerprint: $error');
@@ -151,7 +158,11 @@ class _SshSettingsScreenState extends State<SshSettingsScreen> {
 
   Future<void> _trustFingerprint() async {
     final fingerprint = _presentedFingerprint;
-    if (fingerprint == null) return;
+
+    if (fingerprint == null || !fingerprint.startsWith('SHA256:')) {
+      _showMessage('Retrieve a valid server fingerprint first.');
+      return;
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -190,6 +201,8 @@ class _SshSettingsScreenState extends State<SshSettingsScreen> {
   }
 
   Future<void> _testConnection() async {
+    if (_working) return;
+
     final settings = _currentSettings();
 
     if (!settings.isConfigured || !settings.hasTrustedHost) {
