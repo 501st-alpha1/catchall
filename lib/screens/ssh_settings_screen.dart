@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../note_storage.dart';
 import '../transfer/ssh_connection.dart';
 import '../transfer/ssh_connection_settings.dart';
 import '../transfer/ssh_key_manager.dart';
+import '../transfer/sftp_note_transfer.dart';
 
 class SshSettingsScreen extends StatefulWidget {
   const SshSettingsScreen({super.key});
@@ -210,6 +212,79 @@ class _SshSettingsScreenState extends State<SshSettingsScreen> {
     }
   }
 
+  Future<void> _transferNotes() async {
+    if (_working) return;
+
+    setState(() => _working = true);
+
+    try {
+      final settings = await _currentSettings();
+      final notes = await NoteStorage.list();
+
+      if (notes.isEmpty) {
+        if (mounted) _showMessage('There are no notes to transfer.');
+        return;
+      }
+
+      final transfer = SftpNoteTransfer(
+        settings: settings,
+        keyManager: _keyManager,
+      );
+
+      final result = await transfer.transfer(notes);
+
+      if (!mounted) return;
+
+      final summary = [
+        '${result.uploaded} uploaded',
+        '${result.unchanged} unchanged',
+        '${result.conflicts} conflicts',
+        if (result.failed > 0) '${result.failed} failed',
+      ].join(', ');
+
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Transfer complete'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(summary),
+                if (result.errors.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Files that could not be transferred:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final error in result.errors)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(error),
+                    ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        _showMessage('Transfer failed: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -323,6 +398,19 @@ class _SshSettingsScreenState extends State<SshSettingsScreen> {
               onPressed: _working || !_hasKey ? null : _testConnection,
               icon: const Icon(Icons.wifi_tethering),
               label: const Text('Test SSH connection'),
+            ),
+            const Divider(height: 32),
+            Text('Transfer', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            const Text(
+              'Transfer all notes to the configured directory. '
+              'Existing files are compared and never overwritten.',
+            ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: _working ? null : _transferNotes,
+              icon: const Icon(Icons.upload),
+              label: const Text('Transfer notes'),
             ),
             if (_working) ...[
               const SizedBox(height: 16),
