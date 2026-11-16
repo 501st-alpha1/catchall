@@ -19,6 +19,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   final _scrollController = ScrollController();
 
   String _query = '';
+  bool _unreviewedOnly = false;
   double _scrollOffset = 0;
 
   @override
@@ -163,6 +164,32 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment<bool>(
+                    value: false,
+                    label: Text('All notes'),
+                    icon: Icon(Icons.notes),
+                  ),
+                  ButtonSegment<bool>(
+                    value: true,
+                    label: Text('Unreviewed'),
+                    icon: Icon(Icons.radio_button_unchecked),
+                  ),
+                ],
+                selected: {_unreviewedOnly},
+                onSelectionChanged: (selection) {
+                  setState(() {
+                    _unreviewedOnly = selection.first;
+                  });
+                },
+              ),
+            ),
+          ),
           Expanded(
             child: FutureBuilder<List<_SearchableNote>>(
               future: _notes,
@@ -176,18 +203,27 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 }
 
                 final allNotes = snapshot.data ?? [];
-                final notes = _query.isEmpty
-                    ? allNotes
-                    : allNotes.where((item) {
-                        return item.content.toLowerCase().contains(_query);
-                      }).toList();
+                final notes = allNotes.where((item) {
+                  if (_unreviewedOnly && item.note.reviewed) {
+                    return false;
+                  }
+
+                  return _query.isEmpty ||
+                      item.content.toLowerCase().contains(_query);
+                }).toList();
 
                 if (allNotes.isEmpty) {
                   return const Center(child: Text('No saved notes yet.'));
                 }
 
                 if (notes.isEmpty) {
-                  return const Center(child: Text('No matching notes.'));
+                  return Center(
+                    child: Text(
+                      _unreviewedOnly && _query.isEmpty
+                          ? 'No unreviewed notes.'
+                          : 'No matching notes.',
+                    ),
+                  );
                 }
 
                 return ListView.separated(
