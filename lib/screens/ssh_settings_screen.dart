@@ -231,7 +231,7 @@ class _SshSettingsScreenState extends State<SshSettingsScreen> {
     setState(() => _working = true);
 
     try {
-      final settings = await _currentSettings();
+      final settings = _currentSettings();
       final notes = await NoteStorage.list();
 
       if (notes.isEmpty) {
