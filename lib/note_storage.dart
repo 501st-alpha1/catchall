@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 import 'models/note_record.dart';
+import 'note_metadata_storage.dart';
 
 class NoteStorage {
   static Future<Directory> _notesDirectory() async {
@@ -73,6 +74,10 @@ class NoteStorage {
 
       if (!sameFile) {
         await note.file.delete();
+        await NoteMetadataStorage.renameNote(
+          note.file.uri.pathSegments.last,
+          updatedFile.uri.pathSegments.last,
+        );
       }
 
       return updatedFile;
@@ -83,8 +88,27 @@ class NoteStorage {
     }
   }
 
+  static Future<void> delete(NoteRecord note) async {
+    await note.file.delete();
+    await NoteMetadataStorage.deleteNote(note.file.uri.pathSegments.last);
+  }
+
+  static Future<NoteRecord> setReviewed(NoteRecord note, bool reviewed) async {
+    await NoteMetadataStorage.setReviewed(
+      note.file.uri.pathSegments.last,
+      reviewed,
+    );
+
+    return NoteRecord(
+      file: note.file,
+      createdAt: note.createdAt,
+      reviewed: reviewed,
+    );
+  }
+
   static Future<List<NoteRecord>> list() async {
     final directory = await _notesDirectory();
+    final reviewedNotes = await NoteMetadataStorage.loadReviewed();
     final records = <NoteRecord>[];
 
     await for (final entity in directory.list()) {
@@ -96,7 +120,13 @@ class NoteStorage {
       final timestamp = _parseTimestamp(name);
 
       if (timestamp != null) {
-        records.add(NoteRecord(file: entity, createdAt: timestamp));
+        records.add(
+          NoteRecord(
+            file: entity,
+            createdAt: timestamp,
+            reviewed: reviewedNotes.contains(name),
+          ),
+        );
       }
     }
 

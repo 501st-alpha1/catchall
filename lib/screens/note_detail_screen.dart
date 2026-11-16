@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../models/note_record.dart';
+import '../note_storage.dart';
 import '../utils/date_time_utils.dart';
 
 import 'note_edit_screen.dart';
@@ -41,6 +42,22 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
     });
   }
 
+  Future<void> _toggleReviewed() async {
+    try {
+      final updatedNote = await NoteStorage.setReviewed(_note, !_note.reviewed);
+
+      if (!mounted) return;
+
+      setState(() => _note = updatedNote);
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update reviewed status')),
+      );
+    }
+  }
+
   Future<void> _copyNote() async {
     try {
       final content = await _content;
@@ -69,6 +86,15 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       appBar: AppBar(
         title: const Text('Saved note'),
         actions: [
+          IconButton(
+            tooltip: _note.reviewed ? 'Mark as unreviewed' : 'Mark as reviewed',
+            icon: Icon(
+              _note.reviewed
+                  ? Icons.check_circle
+                  : Icons.radio_button_unchecked,
+            ),
+            onPressed: _toggleReviewed,
+          ),
           IconButton(
             tooltip: 'Edit note',
             icon: const Icon(Icons.edit_outlined),

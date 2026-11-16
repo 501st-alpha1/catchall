@@ -58,6 +58,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
+  Future<void> _toggleReviewed(NoteRecord note) async {
+    try {
+      await NoteStorage.setReviewed(note, !note.reviewed);
+
+      if (!mounted) return;
+
+      setState(_reload);
+    } catch (_) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not update reviewed status')),
+      );
+    }
+  }
+
   Future<void> _deleteNote(NoteRecord note) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -80,7 +96,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (confirmed != true || !mounted) return;
 
     try {
-      await note.file.delete();
+      await NoteStorage.delete(note);
 
       if (!mounted) return;
 
@@ -190,10 +206,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       onTap: () => _openNote(note),
-                      trailing: IconButton(
-                        tooltip: 'Delete note',
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _deleteNote(note),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: note.reviewed
+                                ? 'Mark as unreviewed'
+                                : 'Mark as reviewed',
+                            icon: Icon(
+                              note.reviewed
+                                  ? Icons.check_circle
+                                  : Icons.radio_button_unchecked,
+                            ),
+                            onPressed: () => _toggleReviewed(note),
+                          ),
+                          IconButton(
+                            tooltip: 'Delete note',
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => _deleteNote(note),
+                          ),
+                        ],
                       ),
                     );
                   },

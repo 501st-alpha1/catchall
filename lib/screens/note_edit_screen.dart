@@ -103,9 +103,13 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
 
       if (!mounted) return;
 
-      Navigator.of(
-        context,
-      ).pop(NoteRecord(file: updatedFile, createdAt: _timestamp));
+      Navigator.of(context).pop(
+        NoteRecord(
+          file: updatedFile,
+          createdAt: _timestamp,
+          reviewed: widget.note.reviewed,
+        ),
+      );
     } on FileSystemException catch (error) {
       if (!mounted) return;
 
